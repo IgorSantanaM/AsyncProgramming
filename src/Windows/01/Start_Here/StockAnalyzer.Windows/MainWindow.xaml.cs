@@ -6,6 +6,10 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Navigation;
 using System.Text.Json;
+using System.Net.Http;
+using System.Threading.Tasks;
+using System;
+using StockAnalyzer.Core;
 
 namespace StockAnalyzer.Windows;
 
@@ -19,32 +23,23 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
-
-
-    private void Search_Click(object sender, RoutedEventArgs e)
+    private async void Search_Click(object sender, RoutedEventArgs e)
     {
         BeforeLoadingStockData();
 
-        var client = new WebClient();
-
-        var content = client.DownloadString($"{API_URL}/{StockIdentifier.Text}");
-
-        // Simulate that the web call takes a very long time
-        Thread.Sleep(10000);
-
-        var data = JsonSerializer.Deserialize<IEnumerable<StockPrice>>(content, JsonSerializerOptions.Web);
-
-        Stocks.ItemsSource = data;
+        await GetStocksAsync();
 
         AfterLoadingStockData();
     }
 
+    private async Task GetStocksAsync()
+    {
+        var store = new DataStore();
 
+        var response = await store.GetStockPrices(StockIdentifier.Text);
 
-
-
-
-
+        Stocks.ItemsSource = response;
+    }
 
     private void BeforeLoadingStockData()
     {
