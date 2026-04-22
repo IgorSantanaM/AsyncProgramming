@@ -21,14 +21,21 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
-    private async  void Search_Click(object sender, RoutedEventArgs e)
+    private void Search_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             BeforeLoadingStockData();
-            await Task.Run(() =>
+            var loadLinesTask = Task.Run(() =>
             {
                 var lines = File.ReadAllLines("StockPrices_Small.csv");
+
+                return lines;
+            });
+
+            var processStockTask = loadLinesTask.ContinueWith((completedTask) =>
+            {
+                var lines = completedTask.Result;
 
                 var data = new List<StockPrice>();
 
@@ -43,14 +50,19 @@ public partial class MainWindow : Window
                     Stocks.ItemsSource = data.Where(sp => sp.Identifier == StockIdentifier.Text);
                 });
             });
+
+            processStockTask.ContinueWith(_ =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    AfterLoadingStockData();
+
+                });
+            });
         }
         catch (Exception ex)
         {
             Notes.Text = ex.Message;
-        }
-        finally
-        {
-            AfterLoadingStockData();
         }
     }
 
