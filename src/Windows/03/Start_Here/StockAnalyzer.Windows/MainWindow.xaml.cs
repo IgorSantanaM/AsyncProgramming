@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Navigation;
 using System.Text.Json;
+using System.Collections.Concurrent;
 
 namespace StockAnalyzer.Windows;
 
@@ -56,14 +57,44 @@ public partial class MainWindow : Window
 
             BeforeLoadingStockData();
 
+            var identifiers = StockIdentifier.Text
+                .Split(',', ' ');
+
             var service = new StockService();
+            var loadingTask = new List<Task<IEnumerable<StockPrice>>>();
 
-            var data = await service.GetStockPricesFor(
-                StockIdentifier.Text,
-                cancellationTokenSource.Token
-            );
+            var stocks = new ConcurrentBag<StockPrice>();
 
-            Stocks.ItemsSource = data;
+            foreach (var identifier in identifiers)
+            {
+                var loadTask = service.GetStockPricesFor(identifier, cancellationTokenSource.Token);
+
+                loadTask = loadTask.ContinueWith(t =>
+                {
+                    var aFewStocks = t.Result.Take(5);
+
+                    foreach(var stock in aFewStocks)
+                        stocks.Add(stock);
+
+                    Dispatcher.Invoke(() =>
+                    {
+                       Stocks.ItemsSource = stocks.ToArray();
+                    }); 
+
+                    return aFewStocks;
+                });
+                loadingTask.Add(loadTask);
+            }
+            var allStocksLoadingTask =  Task.WhenAll(loadingTask);
+
+            var timeout = Task.Delay(120000);
+
+            var completedTask = await Task.WhenAny(allStocksLoadingTask, timeout);
+
+            if(completedTask == timeout)
+            {
+                Notes.Text = "Loading stocks timed out.";
+            }
         }
         catch (Exception ex)
         {
@@ -80,7 +111,7 @@ public partial class MainWindow : Window
     }
 
 
-
+ 
 
 
 
