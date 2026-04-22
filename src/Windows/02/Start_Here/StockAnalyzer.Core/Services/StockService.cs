@@ -16,7 +16,7 @@ public interface IStockService
 
 public class StockService : IStockService
 {
-    private static string API_URL = "https://ps-async.fekberg.com/api/stocks";
+    private const string API_URL = "https://ps-async.fekberg.com/api/stocks";
     private int i = 0;
 
     public async Task<IEnumerable<StockPrice>>
