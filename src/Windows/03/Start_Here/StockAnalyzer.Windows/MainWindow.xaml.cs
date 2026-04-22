@@ -32,86 +32,33 @@ public partial class MainWindow : Window
 
     private async void Search_Click(object sender, RoutedEventArgs e)
     {
-        if (cancellationTokenSource is not null)
-        {
-            // Already have an instance of the cancellation token source?
-            // This means the button has already been pressed!
-
-            cancellationTokenSource.Cancel();
-            cancellationTokenSource.Dispose();
-            cancellationTokenSource = null;
-
-            Search.Content = "Search";
-            return;
-        }
-
         try
         {
-            cancellationTokenSource = new();
-
-            cancellationTokenSource.Token.Register(() => {
-                Notes.Text = "Cancellation requested";
-            });
-
-            Search.Content = "Cancel"; // Button text
-
+            cancellationTokenSource?.Cancel();
+            cancellationTokenSource = new CancellationTokenSource();
             BeforeLoadingStockData();
 
-            var identifiers = StockIdentifier.Text
-                .Split(',', ' ');
+            var stocks = await GetStocksFor(StockIdentifier.Text, cancellationTokenSource.Token);
+            Notes.Text = $"Stocks Loaded!";
+            Stocks.ItemsSource = stocks;
 
-            var service = new StockService();
-            var loadingTask = new List<Task<IEnumerable<StockPrice>>>();
-
-            var stocks = new ConcurrentBag<StockPrice>();
-
-            foreach (var identifier in identifiers)
-            {
-                var loadTask = service.GetStockPricesFor(identifier, cancellationTokenSource.Token);
-
-                loadTask = loadTask.ContinueWith(t =>
-                {
-                    var aFewStocks = t.Result.Take(5);
-
-                    foreach(var stock in aFewStocks)
-                        stocks.Add(stock);
-
-                    Dispatcher.Invoke(() =>
-                    {
-                       Stocks.ItemsSource = stocks.ToArray();
-                    }); 
-
-                    return aFewStocks;
-                });
-                loadingTask.Add(loadTask);
-            }
-            var allStocksLoadingTask =  Task.WhenAll(loadingTask);
-
-            var timeout = Task.Delay(120000);
-
-            var completedTask = await Task.WhenAny(allStocksLoadingTask, timeout);
-
-            if(completedTask == timeout)
-            {
-                Notes.Text = "Loading stocks timed out.";
-            }
         }
-        catch (Exception ex)
+        catch (OperationCanceledException)
         {
-            Notes.Text = ex.Message;
-        }
-        finally
-        {
-            AfterLoadingStockData();
-            cancellationTokenSource?.Dispose();
-            cancellationTokenSource = null;
-
-            Search.Content = "Search";
+            Notes.Text = $"Loading stocks for {StockIdentifier.Text} was cancelled.";
         }
     }
 
 
- 
+    private async Task<IEnumerable<StockPrice>> GetStocksFor(string identifier, CancellationToken cancellationToken)
+    {
+        var service = new StockService();
+        var data = await service.GetStockPricesFor(identifier, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.None);
+
+
+        return data.Take(5);
+    }
 
 
 
