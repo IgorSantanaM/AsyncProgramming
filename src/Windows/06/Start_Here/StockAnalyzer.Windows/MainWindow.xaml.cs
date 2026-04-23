@@ -39,28 +39,38 @@ public partial class MainWindow : Window
         var bag = new ConcurrentBag<StockCalculation>();
         var task = Task.Run(() =>
         {
-            Parallel.Invoke(
-                () =>
-                {
-                    var msft = Calculate(stocks["MSFT"]);
-                    bag.Add(msft);
-                },
-                () =>
-                {
-                    var googl = Calculate(stocks["GOOGL"]);
-                    bag.Add(googl);
-                },
-                () =>
-                {
-                    var aapl = Calculate(stocks["AAPL"]);
-                    bag.Add(aapl);
-                },
-                () =>
-                {
-                    var cat = Calculate(stocks["CAT"]);
-                    bag.Add(cat);
-                }
+            Parallel.ForEach(stocks, new ParallelOptions() { MaxDegreeOfParallelism = 2}, (stock, state) =>
+            {
+                //state.Break();
+                
+                StockCalculation result = Calculate(stock.Value);
+                bag.Add(result);
+            }
             );
+
+            //Parallel.Invoke(
+            //    //new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = default, TaskScheduler = TaskScheduler.Default },
+            //    () =>
+            //    {
+            //        var msft = Calculate(stocks["MSFT"]);
+            //        bag.Add(msft);
+            //    },
+            //    () =>
+            //    {
+            //        var googl = Calculate(stocks["GOOGL"]);
+            //        bag.Add(googl);
+            //    },
+            //    () =>
+            //    {
+            //        var aapl = Calculate(stocks["AAPL"]);
+            //        bag.Add(aapl);
+            //    },
+            //    () =>
+            //    {
+            //        var cat = Calculate(stocks["CAT"]);
+            //        bag.Add(cat);
+            //    }
+            //);
         });
         var timeout = Task.Delay(TimeSpan.FromSeconds(10));
 
