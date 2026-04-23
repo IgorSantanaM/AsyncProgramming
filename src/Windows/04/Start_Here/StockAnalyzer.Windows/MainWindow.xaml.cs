@@ -1,26 +1,24 @@
 ﻿using StockAnalyzer.Core;
 using StockAnalyzer.Core.Domain;
 using StockAnalyzer.Core.Services;
+using StockAnalyzer.Windows.Services;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Navigation;
-using System.Text.Json;
 
 namespace StockAnalyzer.Windows;
 
 public partial class MainWindow : Window
 {
     private static string API_URL = "https://ps-async.fekberg.com/api/stocks";
-    private Stopwatch stopwatch = new Stopwatch();
+    private Stopwatch stopwatch = new();
 
     public MainWindow()
     {
@@ -32,6 +30,36 @@ public partial class MainWindow : Window
 
     private async void Search_Click(object sender, RoutedEventArgs e)
     {
+        try
+        {
+            if (cancellationTokenSource is not null)
+            {
+                cancellationTokenSource.Cancel();
+                cancellationTokenSource.Dispose();
+                cancellationTokenSource = null;
+            }
+            BeforeLoadingStockData();
+
+            var identifiers = StockIdentifier.Text.Split(' ', ',');
+            var data = new ObservableCollection<StockPrice>();
+
+            Stocks.ItemsSource = data;
+
+            var service = new StockDiskStreamService();
+
+            var enumerator = service.GetAllStockPrices();
+
+            await foreach (var stock in enumerator
+                .WithCancellation(CancellationToken.None))
+            {
+                if (identifiers.Contains(stock.Identifier))
+                    data.Add(stock);
+            }
+        }
+        catch (Exception ex)
+        {
+            Notes.Text = ex.Message;
+        }
     }
 
     private async Task SearchForStocks()
@@ -98,7 +126,7 @@ public partial class MainWindow : Window
         var data = await service.GetStockPricesFor(identifier,
             CancellationToken.None).ConfigureAwait(false);
 
-        
+
 
         return data.Take(5);
     }
