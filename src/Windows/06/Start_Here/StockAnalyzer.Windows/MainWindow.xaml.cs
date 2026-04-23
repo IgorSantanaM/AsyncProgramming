@@ -1,20 +1,11 @@
-﻿using StockAnalyzer.Core;
-using StockAnalyzer.Core.Domain;
-using StockAnalyzer.Core.Services;
-using StockAnalyzer.Windows.Services;
+﻿using StockAnalyzer.Core.Domain;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Navigation;
 
 namespace StockAnalyzer.Windows;
@@ -22,8 +13,8 @@ namespace StockAnalyzer.Windows;
 public partial class MainWindow : Window
 {
     private static string API_URL = "https://ps-async.fekberg.com/api/stocks";
-    private Stopwatch stopwatch = new Stopwatch();
-    private Random random = new Random();
+    private Stopwatch stopwatch = new();
+    private Random random = new();
 
     public MainWindow()
     {
@@ -45,8 +36,43 @@ public partial class MainWindow : Window
                 { "AAPL", Generate("AAPL") },
                 { "CAT", Generate("CAT") }
             };
-        
+        var bag = new ConcurrentBag<StockCalculation>();
+        var task = Task.Run(() =>
+        {
+            Parallel.Invoke(
+                () =>
+                {
+                    var msft = Calculate(stocks["MSFT"]);
+                    bag.Add(msft);
+                },
+                () =>
+                {
+                    var googl = Calculate(stocks["GOOGL"]);
+                    bag.Add(googl);
+                },
+                () =>
+                {
+                    var aapl = Calculate(stocks["AAPL"]);
+                    bag.Add(aapl);
+                },
+                () =>
+                {
+                    var cat = Calculate(stocks["CAT"]);
+                    bag.Add(cat);
+                }
+            );
+        });
+        var timeout = Task.Delay(TimeSpan.FromSeconds(10));
 
+        var completed = await Task.WhenAny(task, timeout);
+
+        if (completed == timeout)
+        {
+            Notes.Text = "Timeout";
+            return;
+        }
+
+        Stocks.ItemsSource = bag;
         AfterLoadingStockData();
     }
 
