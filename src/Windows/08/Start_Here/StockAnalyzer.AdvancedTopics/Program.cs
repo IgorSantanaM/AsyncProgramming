@@ -8,23 +8,38 @@ internal class Program
     {
         Stopwatch stopwatch = new();
         stopwatch.Start();
+        var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(2));
+
+        var parallelOptions = new ParallelOptions
+        {
+            CancellationToken = cancellationTokenSource.Token,
+            MaxDegreeOfParallelism = 100
+        };
 
         Lock lockObject = new();
         int total = 0;
-        Parallel.For(0, 100, (i) =>
+        try
         {
-            var result = Compute(i);
-            Interlocked.Add(ref total, (int)result);
-            
-            //lock (lockObject)
-            //    total += result;
-        });
+            Parallel.For(0, 100, parallelOptions, (i) =>
+            {
+                var result = Compute(i);
+                Interlocked.Add(ref total, (int)result);
+
+                //lock (lockObject)
+                //    total += result;
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("Operation canceled!");
+        }
 
         //var task2 = Task.Run(() =>
         //{
         //    Parallel.For(50, 100, (i) =>
         //    {
-         //        int result = Compute(i);
+        //        int result = Compute(i);
         //        lock (lockObject)
         //            total += result;
         //    });
